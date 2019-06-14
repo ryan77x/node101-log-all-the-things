@@ -1,11 +1,13 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const morgan = require('morgan');
 const csv = require('csvtojson');
 
 const file = path.join(__dirname, '../log.csv');
 const tempFile = path.join(__dirname, '../temp_log.csv');
 const logFileHeader = 'Agent,Time,Method,Resource,Version,Status\n';
+const formatStr = ':user-agent,:date[iso],:method,:url,HTTP/:http-version,:status';
 
 const app = express();
 
@@ -20,24 +22,10 @@ fs.stat(file, function(err, stat) {
     } 
 });
 
-app.use((req, res, next) => {
-    let userAgent = req.headers["user-agent"].replace(/\, /g, ' ');
-    let date = new Date().toISOString();
-    let method = req.method;
-    let resource = req.originalUrl;
-    let protocol = req.protocol.toUpperCase()+'/';
-    let version = req.httpVersion;
-    let statusCode = res.statusCode;
-    let output = userAgent+','+date+','+method+','+resource+','+protocol+version+','+statusCode+'\n';
+var logStream = fs.createWriteStream(file, {flags: 'a'});
 
-    fs.appendFile(file, output, function (err) {
-        if (err) 
-            throw err;
-    });
-
-    console.log(output);
-    next()
-});
+app.use(morgan(formatStr));
+app.use(morgan(formatStr, {stream: logStream}));
 
 app.get('/', (req, res) => {
     res.json("ok");
@@ -45,10 +33,22 @@ app.get('/', (req, res) => {
 });
 
 app.get('/logs', (req, res) => {
-    csv()
-    .fromFile(file)
-    .then((result) => {
-        res.json(result);
+    fs.readFile(file, 'utf8', function (err,data) {
+        if (err) {
+            return console.log(err);
+        }
+        var result = data.replace(/\, /g, ' ');
+    
+        fs.writeFile(tempFile, result, 'utf8', function (err) {
+        if (err) 
+            return console.log(err);
+
+            csv()
+            .fromFile(tempFile)
+            .then((result) => {
+                res.json(result);
+            });
+        });
     });
  });
 
