@@ -3,17 +3,24 @@ const fs = require('fs');
 const path = require('path');
 const csv = require('csvtojson');
 
-const file = path.join(__dirname, '../logs/log.csv');
+const folderPath = path.join(__dirname, '../logs/');
+const fileName = folderPath+'log.csv';
 const logFileHeader = 'Agent,Time,Method,Resource,Version,Status\n';
 
 const app = express();
 
-fs.stat(file, function(err, stat) {
+//check if log folder exists else create it
+if (!fs.existsSync(folderPath)){
+    fs.mkdirSync(folderPath);
+}
+
+//check if log file exists
+fs.stat(fileName, function(err, stat) {
     if(err == null) {
-        //do nothing if file exists else add log file header to top of the file content
+        //do nothing if file exists else create log file and add header to top of the file content
     } 
     else if(err.code == 'ENOENT') {
-        appendContent(file, logFileHeader);
+        appendContent(logFileHeader);
     } 
 });
 
@@ -27,7 +34,7 @@ app.use((req, res, next) => {
     let statusCode = res.statusCode;
     let output = userAgent+','+date+','+method+','+resource+','+protocol+version+','+statusCode+'\n';
 
-    appendContent(file, output);
+    appendContent(output);
 
     console.log(output);
     next()
@@ -40,14 +47,15 @@ app.get('/', (req, res) => {
 
 app.get('/logs', (req, res) => {
     csv()
-    .fromFile(file)
+    .fromFile(fileName)
     .then((result) => {
         res.json(result);
     });
  });
 
- function appendContent(file, content){
-    fs.appendFile(file, content, function (err) {
+ function appendContent(content){
+    //file is created automatically if not existed 
+    fs.appendFile(fileName, content, function (err) {
         if (err) 
             throw err;
     });
